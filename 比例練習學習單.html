@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>翻牌組成比例 - 互動學習單 (5題版)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #f8fafc;
+    }
+    
+    /* 3D 翻牌效果 */
+    .card-perspective {
+      perspective: 1000px;
+    }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-style: preserve-3d;
+      cursor: pointer;
+    }
+
+    .card-inner.is-flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-front, .card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    /* 蓋牌樣式 (藍紫色漸層) */
+    .card-back {
+      background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+      color: white;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      border: 2px solid #6366f1;
+    }
+
+    /* 翻開數字樣式 */
+    .card-front {
+      background-color: #ffffff;
+      color: #1e293b;
+      transform: rotateY(180deg);
+      border: 2px solid #cbd5e1;
+      box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* 洗牌動畫 */
+    @keyframes shuffle {
+      0% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-10px) rotate(-6deg); }
+      50% { transform: translateY(6px) rotate(6deg); }
+      75% { transform: translateY(-4px) rotate(-3deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+
+    .animate-shuffle {
+      animation: shuffle 0.45s ease-in-out;
+    }
+
+    /* 隱藏數字輸入框預設箭頭 */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="text-slate-800 pb-16 min-h-screen">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+    <div class="max-w-5xl mx-auto px-4 py-3 sm:py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 text-white p-2.5 rounded-xl font-black text-2xl shadow-indigo-200 shadow-lg">
+          🎰
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            翻牌組成比例
+            <span class="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full font-semibold">5 題互動版</span>
+          </h1>
+          <p class="text-xs text-slate-500">點擊卡片翻牌，判斷抽出的 4 個數字能否組成相等比例！</p>
+        </div>
+      </div>
+
+      <!-- 控制按鈕組 -->
+      <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+        <button id="btn-reveal-all" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition flex items-center gap-1.5">
+          <span>👁️</span> 一鍵全部翻開
+        </button>
+        <button id="btn-hide-all" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition flex items-center gap-1.5">
+          <span>🙈</span> 一鍵全部蓋牌
+        </button>
+        <button id="btn-shuffle" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-100 transition flex items-center gap-1.5">
+          <span>🔀</span> 重新洗牌發牌
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 mt-6">
+    
+    <!-- 玩法說明與指定數字庫資訊 -->
+    <div class="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 mb-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div class="space-y-1">
+        <h2 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
+          <span>💡</span> 遊戲規則：
+        </h2>
+        <ul class="text-sm text-slate-600 space-y-1 list-disc list-inside">
+          <li>點擊左側<b>背面卡片</b>即可翻牌，查看發出的 4 個數字。</li>
+          <li>判斷這 4 個數字是否可以重新排列組成比例式（滿足 <code class="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-600 font-mono font-bold">a : b = c : d</code>）。</li>
+          <li>選擇「可以」並填入相應比例式，或選擇「不可以」，完成後點擊「檢查答案 / 送出批改」。</li>
+        </ul>
+      </div>
+
+      <!-- 固定數字庫清單展示 -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 w-full md:w-auto shrink-0">
+        <label class="block text-xs font-bold text-slate-500 mb-1.5">指定發牌數字庫 (共12個)：</label>
+        <div class="flex flex-wrap gap-1 max-w-xs">
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">4</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">6</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">8</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">12</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">24</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">32</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">36</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">48</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">52</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">64</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">72</span>
+          <span class="bg-indigo-50 text-indigo-700 font-mono font-bold text-xs px-2 py-0.5 rounded border border-indigo-200">96</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <!-- 表頭 -->
+      <div class="grid grid-cols-12 bg-slate-100/80 border-b border-slate-200 font-bold text-center py-3.5 px-3 text-slate-700 text-sm sm:text-base">
+        <div class="col-span-1 border-r border-slate-200">題號</div>
+        <div class="col-span-5 sm:col-span-5 border-r border-slate-200">翻開的卡片</div>
+        <div class="col-span-6 sm:col-span-6">組成比例判斷</div>
+      </div>
+
+      <!-- 題目容器 (由 JavaScript 動態生成 5 題) -->
+      <div id="questions-container" class="divide-y divide-slate-200"></div>
+    </div>
+
+    <!-- 底部提交與結果通報區 -->
+    <div class="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div id="summary-box" class="hidden text-base font-bold px-6 py-4 rounded-xl w-full sm:w-auto text-center transition"></div>
+      <div class="flex gap-3 w-full sm:w-auto justify-end">
+        <button id="btn-submit" class="w-full sm:w-auto px-10 py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-95 text-white font-bold text-lg rounded-xl shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2">
+          <span>✅</span> 檢查答案 / 送出批改
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const TOTAL_QUESTIONS = 5; // 更改為 5 條題目
+    
+    // 指定的固定數字庫 (12 個數字)
+    const FIXED_NUMBER_POOL = [4, 6, 8, 12, 24, 32, 36, 48, 52, 64, 72, 96];
+
+    // 預設 5 題初始卡片數字 (均取材自固定數字庫)
+    const INITIAL_PRESETS = [
+      [4, 8, 12, 24],    // 可組成 4 : 8 = 12 : 24
+      [6, 32, 52, 96],   // 無法組成比例
+      [12, 24, 36, 72],  // 可組成 12 : 24 = 36 : 72
+      [8, 12, 32, 48],   // 可組成 8 : 12 = 32 : 48
+      [4, 6, 52, 64]     // 無法組成比例
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initApp();
+    });
+
+    function initApp() {
+      renderQuestions();
+      bindGlobalEvents();
+    }
+
+    // 動態渲染 5 條題目
+    function renderQuestions() {
+      const container = document.getElementById('questions-container');
+      container.innerHTML = '';
+
+      for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+        const defaultCardValues = INITIAL_PRESETS[i];
+        const row = document.createElement('div');
+        row.className = 'question-row grid grid-cols-12 px-2 py-6 items-center hover:bg-slate-50/50 transition relative';
+        row.dataset.qid = i;
+
+        row.innerHTML = `
+          <!-- 題號 -->
+          <div class="col-span-1 text-center font-black text-slate-500 text-lg sm:text-xl border-r border-slate-200 py-4">
+            ${i + 1}.
+          </div>
+
+          <!-- 4張 3D 翻牌卡片區 -->
+          <div class="col-span-5 sm:col-span-5 px-2 sm:px-4 border-r border-slate-200">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 max-w-xs sm:max-w-none mx-auto">
+              ${defaultCardValues.map((val) => `
+                <div class="card-perspective h-16 sm:h-20">
+                  <div class="card-inner" data-card-val="${val}" onclick="toggleCard(this)">
+                    <!-- 卡片背面 (蓋牌) -->
+                    <div class="card-back">
+                      <span class="text-sm font-bold opacity-80">❓</span>
+                    </div>
+                    <!-- 卡片正面 (數字) -->
+                    <div class="card-front">
+                      <span class="card-num-text text-xl sm:text-2xl font-black text-indigo-900">${val}</span>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <p class="text-center text-[11px] text-slate-400 mt-2">（點擊卡片翻面）</p>
+          </div>
+
+          <!-- 答案選項與填空區 -->
+          <div class="col-span-6 sm:col-span-6 px-3 sm:px-6 flex flex-col justify-center space-y-3.5">
+            
+            <!-- 選項 1：可以組成比例 -->
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="inline-flex items-center cursor-pointer space-x-2 shrink-0">
+                <input type="radio" name="opt_${i}" value="yes" onchange="onOptionChange(${i}, 'yes')" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
+                <span class="font-bold text-slate-800 text-sm sm:text-base">可以組成比例，如</span>
+              </label>
+
+              <!-- 比例式填空 [a] : [b] = [c] : [d] -->
+              <div class="inline-flex items-center gap-1 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                <input type="number" class="prop-input w-9 h-9 sm:w-11 sm:h-11 border border-slate-300 rounded-lg text-center font-bold text-slate-800 text-base bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-200/60 disabled:opacity-50" data-pos="0" disabled>
+                <span class="font-bold text-slate-600">:</span>
+                <input type="number" class="prop-input w-9 h-9 sm:w-11 sm:h-11 border border-slate-300 rounded-lg text-center font-bold text-slate-800 text-base bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-200/60 disabled:opacity-50" data-pos="1" disabled>
+                <span class="font-bold text-slate-600">=</span>
+                <input type="number" class="prop-input w-9 h-9 sm:w-11 sm:h-11 border border-slate-300 rounded-lg text-center font-bold text-slate-800 text-base bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-200/60 disabled:opacity-50" data-pos="2" disabled>
+                <span class="font-bold text-slate-600">:</span>
+                <input type="number" class="prop-input w-9 h-9 sm:w-11 sm:h-11 border border-slate-300 rounded-lg text-center font-bold text-slate-800 text-base bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-200/60 disabled:opacity-50" data-pos="3" disabled>
+                <span class="font-bold text-slate-600">。</span>
+              </div>
+            </div>
+
+            <!-- 選項 2：不可以組成比例 -->
+            <div class="flex items-center">
+              <label class="inline-flex items-center cursor-pointer space-x-2">
+                <input type="radio" name="opt_${i}" value="no" onchange="onOptionChange(${i}, 'no')" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
+                <span class="font-bold text-slate-800 text-sm sm:text-base">不可以組成比例。</span>
+              </label>
+            </div>
+
+            <!-- 批改結果提示區 -->
+            <div class="feedback-box hidden text-xs sm:text-sm font-semibold rounded-xl p-3"></div>
+          </div>
+        `;
+
+        container.appendChild(row);
+      }
+    }
+
+    // 單張卡片點擊翻轉
+    function toggleCard(cardInnerEl) {
+      cardInnerEl.classList.toggle('is-flipped');
+    }
+
+    // 控制填空輸入框啟用/禁用
+    function onOptionChange(qid, val) {
+      const row = document.querySelector(`[data-qid="${qid}"]`);
+      const inputs = row.querySelectorAll('.prop-input');
+      
+      if (val === 'yes') {
+        inputs.forEach(inp => inp.disabled = false);
+        inputs[0].focus();
+      } else {
+        inputs.forEach(inp => {
+          inp.disabled = true;
+          inp.value = '';
+        });
+      }
+    }
+
+    // 綁定頂部控制按鈕事件
+    function bindGlobalEvents() {
+      // 一鍵全部翻開
+      document.getElementById('btn-reveal-all').addEventListener('click', () => {
+        document.querySelectorAll('.card-inner').forEach(card => card.classList.add('is-flipped'));
+      });
+
+      // 一鍵全部蓋牌
+      document.getElementById('btn-hide-all').addEventListener('click', () => {
+        document.querySelectorAll('.card-inner').forEach(card => card.classList.remove('is-flipped'));
+      });
+
+      // 重新洗牌發牌
+      document.getElementById('btn-shuffle').addEventListener('click', shuffleAndRedeal);
+
+      // 檢查答案 / 送出批改
+      document.getElementById('btn-submit').addEventListener('click', validateAnswers);
+    }
+
+    function shuffleAndRedeal() {
+      resetFeedback();
+
+      for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+        const row = document.querySelector(`[data-qid="${i}"]`);
+        const cards = row.querySelectorAll('.card-inner');
+
+        // 先蓋牌
+        cards.forEach(card => card.classList.remove('is-flipped'));
+
+        let drawnNums = [];
+
+        // 60% 機率抽選可組成比例的組合，40% 機率完全隨機抽取
+        if (Math.random() > 0.4) {
+          let validCombo = findValidPoolCombo();
+          if (validCombo) {
+            drawnNums = validCombo;
+          } else {
+            drawnNums = getRandomSampleFromPool(4);
+          }
+        } else {
+          drawnNums = getRandomSampleFromPool(4);
+        }
+
+        setTimeout(() => {
+          cards.forEach((card, idx) => {
+            const numText = card.querySelector('.card-num-text');
+            const val = drawnNums[idx];
+            card.dataset.cardVal = val;
+            numText.textContent = val;
+
+            card.classList.add('animate-shuffle');
+            setTimeout(() => card.classList.remove('animate-shuffle'), 450);
+          });
+        }, 200);
+      }
+    }
+
+    // 從 FIXED_NUMBER_POOL 中隨機抽取 4 個數字
+    function getRandomSampleFromPool(n) {
+      const poolCopy = [...FIXED_NUMBER_POOL];
+      poolCopy.sort(() => Math.random() - 0.5);
+      return poolCopy.slice(0, n);
+    }
+
+    // 在 FIXED_NUMBER_POOL 尋找一組可成立比例的四元組
+    function findValidPoolCombo() {
+      const pool = FIXED_NUMBER_POOL;
+      const validCombos = [];
+
+      for (let i = 0; i < pool.length; i++) {
+        for (let j = 0; j < pool.length; j++) {
+          if (i === j) continue;
+          for (let k = 0; k < pool.length; k++) {
+            if (k === i || k === j) continue;
+            for (let l = 0; l < pool.length; l++) {
+              if (l === i || l === j || l === k) continue;
+              const a = pool[i], b = pool[j], c = pool[k], d = pool[l];
+              if (a * d === b * c) {
+                validCombos.push([a, b, c, d]);
+              }
+            }
+          }
+        }
+      }
+
+      if (validCombos.length > 0) {
+        const randomIndex = Math.floor(Math.random() * validCombos.length);
+        return validCombos[randomIndex];
+      }
+      return null;
+    }
+
+    // 判斷 4 個數字是否能組成比例 (a*d = b*c)
+    function canFormProportion(nums) {
+      if (nums.length !== 4) return false;
+      const [a, b, c, d] = nums;
+      return (a * b === c * d) || (a * c === b * d) || (a * d === b * c);
+    }
+
+    // 取得成立的比例式解答範例
+    function getValidProportionExample(nums) {
+      const permutations = (arr) => {
+        if (arr.length <= 1) return [arr];
+        let res = [];
+        for (let i = 0; i < arr.length; i++) {
+          const current = arr[i];
+          const remaining = arr.slice(0, i).concat(arr.slice(i + 1));
+          for (let p of permutations(remaining)) {
+            res.push([current, ...p]);
+          }
+        }
+        return res;
+      };
+
+      for (let p of permutations(nums)) {
+        const [a, b, c, d] = p;
+        if (a * d === b * c) {
+          return `${a} : ${b} = ${c} : ${d}`;
+        }
+      }
+      return null;
+    }
+
+    // 清空回饋與狀態
+    function resetFeedback() {
+      document.getElementById('summary-box').className = 'hidden';
+      for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+        const row = document.querySelector(`[data-qid="${i}"]`);
+        row.classList.remove('bg-emerald-50/70', 'bg-rose-50/70');
+        const fb = row.querySelector('.feedback-box');
+        fb.className = 'feedback-box hidden text-xs sm:text-sm font-semibold rounded-xl p-3';
+        fb.innerHTML = '';
+
+        const radios = row.querySelectorAll('input[type="radio"]');
+        radios.forEach(r => r.checked = false);
+
+        const inputs = row.querySelectorAll('.prop-input');
+        inputs.forEach(inp => {
+          inp.value = '';
+          inp.disabled = true;
+        });
+      }
+    }
+
+    function validateAnswers() {
+      // 批改時自動翻開所有卡片
+      document.querySelectorAll('.card-inner').forEach(card => card.classList.add('is-flipped'));
+
+      let correctCount = 0;
+
+      for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+        const row = document.querySelector(`[data-qid="${i}"]`);
+        const fb = row.querySelector('.feedback-box');
+
+        const cards = row.querySelectorAll('.card-inner');
+        const cardNums = Array.from(cards).map(c => parseInt(c.dataset.cardVal));
+
+        const isPossible = canFormProportion(cardNums);
+        const selectedOpt = row.querySelector(`input[name="opt_${i}"]:checked`)?.value;
+
+        if (!selectedOpt) {
+          showFeedback(row, fb, false, '⚠️ 請選擇「可以組成比例」或「不可以組成比例」');
+          continue;
+        }
+
+        if (selectedOpt === 'no') {
+          if (!isPossible) {
+            showFeedback(row, fb, true, '🎯 正確！這 4 個數字確實無法組成比例。');
+            correctCount++;
+          } else {
+            const example = getValidProportionExample(cardNums);
+            showFeedback(row, fb, false, `❌ 答錯囉！這 4 個數字可以組成比例，例如：${example}`);
+          }
+        } else if (selectedOpt === 'yes') {
+          const userInputs = Array.from(row.querySelectorAll('.prop-input')).map(inp => parseInt(inp.value));
+
+          if (userInputs.some(isNaN)) {
+            showFeedback(row, fb, false, '⚠️ 請完整填寫比例式：[  ] : [  ] = [  ] : [  ]');
+            continue;
+          }
+
+          // 1. 檢查填寫數字是否完全剛好是該題發出的 4 個數字
+          const sortedCards = [...cardNums].sort((a, b) => a - b);
+          const sortedUser = [...userInputs].sort((a, b) => a - b);
+          const isSameDigits = sortedCards.every((v, idx) => v === sortedUser[idx]);
+
+          if (!isSameDigits) {
+            showFeedback(row, fb, false, '❌ 填寫的數字必須完全剛好是上方翻開的 4 張卡片數字！');
+            continue;
+          }
+
+          // 2. 驗證 外項積 = 內項積 (a * d = b * c)
+          const [a, b, c, d] = userInputs;
+          if (a * d === b * c) {
+            showFeedback(row, fb, true, `🎯 正確！${a} : ${b} = ${c} : ${d} （驗證：外項積 ${a}×${d} = 內項積 ${b}×${c} = ${a*d}）`);
+            correctCount++;
+          } else {
+            showFeedback(row, fb, false, `❌ 比例式不成立！內項積 (${b}×${c}=${b*c}) 與 外項積 (${a}×${d}=${a*d}) 不相等。`);
+          }
+        }
+      }
+
+      // 總成績與得分統計提示
+      const summaryBox = document.getElementById('summary-box');
+      summaryBox.classList.remove('hidden');
+
+      if (correctCount === TOTAL_QUESTIONS) {
+        summaryBox.className = 'text-base font-bold px-6 py-3.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 w-full sm:w-auto text-center shadow-sm';
+        summaryBox.innerHTML = `🎉 太棒了！5 題全對！得分：${correctCount} / ${TOTAL_QUESTIONS}`;
+      } else {
+        summaryBox.className = 'text-base font-bold px-6 py-3.5 rounded-xl bg-amber-100 text-amber-800 border border-amber-300 w-full sm:w-auto text-center shadow-sm';
+        summaryBox.innerHTML = `💪 得分：${correctCount} / ${TOTAL_QUESTIONS}，請參考上方解析修正答案！`;
+      }
+    }
+
+    function showFeedback(row, fb, isCorrect, message) {
+      fb.classList.remove('hidden');
+      row.classList.remove('bg-emerald-50/70', 'bg-rose-50/70');
+
+      if (isCorrect) {
+        row.classList.add('bg-emerald-50/70');
+        fb.className = 'feedback-box text-xs sm:text-sm font-bold text-emerald-800 bg-emerald-100/80 border border-emerald-200 rounded-xl p-3';
+        fb.innerHTML = message;
+      } else {
+        row.classList.add('bg-rose-50/70');
+        fb.className = 'feedback-box text-xs sm:text-sm font-bold text-rose-800 bg-rose-100/80 border border-rose-200 rounded-xl p-3';
+        fb.innerHTML = message;
+      }
+    }
+  </script>
+</body>
+</html>
